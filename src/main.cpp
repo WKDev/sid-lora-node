@@ -64,8 +64,7 @@ void setup()
   {
     Serial.println("typical boot.");
   }
-
-
+  
   for(int i = 0; i<16 ; i++){
     Serial.print(DevEui[i]);
   }

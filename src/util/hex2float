@@ -1,0 +1,34 @@
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+
+using namespace std;
+int main(void){
+    union converter{
+        float f_val;
+        unsigned int u_val;
+    };
+
+    unsigned char x, y, z, e = 0;
+
+    union converter a;
+    printf("Input float value : " );
+    scanf_s("%f", &a.f_val);
+
+    printf("Input : %f\n", a.f_val);
+    printf("HEX : 0x%X\n", a.u_val);
+
+    float temp = 0.5444;
+
+//    unsigned char x, y, z, e = 0;
+
+    x = *(char *)&temp;
+    y = *((char *)&temp+1);
+    z = *((char *)&temp+2);
+    e = *((char *)&temp+3);
+
+    printf("x : %X\n", x);
+    printf("y : %X\n", y);
+    printf("z : %X\n", z);
+    printf("e : %X\n", e);
+}

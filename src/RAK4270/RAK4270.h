@@ -11,7 +11,7 @@ public:
 
   void init(Stream *ser, int txpin, int rxpin);
     void getStatus();
-    void SendData(const char *addr, const char *payload);
+    void SendData(const char *port, const char *payload);
     char *getDevEui();
     char *getAppEui();
     void setAppEui(String phrase);

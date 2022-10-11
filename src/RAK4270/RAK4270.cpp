@@ -31,7 +31,7 @@ void RAK4270::setJoin()
   while (true)
   {
     _rak->write("at+join\r\n");
-    delay(2000);
+    delay(5000);
 
     int availableBytes = _rak->available();
     for (int i = 0; i < availableBytes; i++)
@@ -40,15 +40,13 @@ void RAK4270::setJoin()
     }
     _rak->flush();
 
-    Serial.print("cmd : [at+join] | resp : ");
-    for (int j = 0; j < 29; j++)
+    String s = "";
+    for (int i = 0; i < 20; i++)
     {
-      if (recvString[j] != '\0')
-      {
-        Serial.print(recvString[j]);
-      }
+      s += String(recvString[i]);
     }
-    // Serial.println("");
+
+    Serial.println(s);
 
     if (recvString[0] == 'O' && recvString[1] == 'K')
     {
@@ -56,28 +54,57 @@ void RAK4270::setJoin()
     }
     else
     {
-      break;
-
-      // retryCount++;
-      // if (retryCount < 5)
-      // {
-      //   Serial.print("..");
-      // }
-      // else
-      // {
-      //   Serial.println("AT Join Failed 5 times! _rak & ESP reset.");
-
-      //   // _rak->write("at+set_config=device:restart\r\n");
-      //   delay(100);
-
-      //   // ESP.restart();
+      retryCount++;
+      if (retryCount < 5)
+      {
+        Serial.print("..");
+      }
+      else
+      {
+        Serial.println("AT sleep Failed 5 times! _rak & ESP reset.");
+        delay(100);
+        break;
+      }
     }
-  }
-  Serial.println("");
 
-  delay(_TimeOut);
+    // Serial.print("cmd : [at+join] | resp : ");
+    // for (int j = 0; j < 29; j++)
+    // {
+    //   if (recvString[j] != '\0')
+    //   {
+    //     Serial.print(recvString[j]);
+    //   }
+    // }
+    // // Serial.println("");
+
+    // if (recvString[0] == 'O' && recvString[1] == 'K')
+    // {
+    //   break;
+    // }
+    // else
+    // {
+    //   break;
+
+    // retryCount++;
+    // if (retryCount < 5)
+    // {
+    //   Serial.print("..");
+    // }
+    // else
+    // {
+    //   Serial.println("AT Join Failed 5 times! _rak & ESP reset.");
+
+    //   // _rak->write("at+set_config=device:restart\r\n");
+    //   delay(100);
+
+    //   // ESP.restart();
+    Serial.println("");
+    delay(_TimeOut);
+  }
 }
 
+// at+get_config=lora:status
+// at+send=lora:16:a1b1c1d1e1f2
 void RAK4270::SendData(const char *port, const char *payload)
 {
 
@@ -107,17 +134,19 @@ void RAK4270::SendData(const char *port, const char *payload)
 
     Serial.print("cmd : " + cmd + " | resp : ");
 
-    for (int j = 0; j < 60; j++)
+    if (recvString[0] == 'O' && recvString[1] == 'K')
     {
-      if (recvString[j] != '0' && recvString[j] != 0 && recvString[j] != '\0')
+      String s = "";
+      for (int i = 0; i < 20; i++)
       {
-        Serial.print(recvString[j]);
+        s += String(recvString[i]);
       }
+
+      Serial.println(s);
+      break;
     }
-
-    if (recvString[0] == 'E' && recvString[1] == 'R')
+    else
     {
-
       retryCount++;
       if (retryCount < 5)
       {
@@ -125,21 +154,11 @@ void RAK4270::SendData(const char *port, const char *payload)
       }
       else
       {
-        Serial.println("AT Send Failed 5 times! _rak & ESP reset.");
-
-        // _rak->write("at+set_config=device:restart\r\n");
+        Serial.println("AT send Failed 5 times! _rak & ESP reset.");
         delay(100);
-
-        // ESP.restart();
         break;
       }
     }
-    else if (recvString[0] == 'O' && recvString[1] == 'K')
-    {
-      Serial.println("AT Send Success.");
-      break;
-    }
-
     Serial.println("");
 
     delay(_TimeOut);
@@ -148,9 +167,9 @@ void RAK4270::SendData(const char *port, const char *payload)
 
 char *RAK4270::getDevEui()
 {
-  char recvString[1000] = {
-      'a',
-  };
+  // char recvString[1000] = {
+  //     'a',
+  // };
 
   //  char *eui = (char *)malloc(sizeof(char) * 16);
   char *eui = new char[16];
@@ -394,58 +413,12 @@ void RAK4270::setAppEui(String phrase)
 
 void RAK4270::restart()
 {
-  char recvString[32] = {
-      0,
-  };
-  int retryCount = 0;
+  _rak->write("at+set_config=device:restart\r\n");
+  delay(500);
 
-  while (true)
-  {
-    _rak->write("at+set_config=device:restart\r\n");
-    delay(500);
+  _rak->flush();
 
-    int availableBytes = _rak->available();
-    for (int i = 0; i < availableBytes; i++)
-    {
-      recvString[i] = _rak->read();
-    }
-    _rak->flush();
-
-    Serial.print("cmd : [at+set_config=device:restart] | resp : ");
-    // for (int j = 0; j < 29; j++)
-    // {
-    //         if (recvString[j]!='0'){
-    // Serial.print(recvString[j]);
-    //       Serial.print(" ");
-    //}
-    // }
-
-    if (recvString[0] == 'O' && recvString[1] == 'K')
-    {
-      Serial.println("AT Success. restart device.");
-      break;
-    }
-    else
-    {
-      retryCount++;
-      if (retryCount < 5)
-      {
-        Serial.print("..");
-      }
-      else
-      {
-        Serial.println("AT restart Failed 5 times! _rak & ESP reset.");
-
-        _rak->write("at+set_config=device:restart\r\n");
-        delay(100);
-
-        ESP.restart();
-      }
-    }
-    Serial.println("");
-
-    delay(_TimeOut);
-  }
+  Serial.println("cmd : [at+set_config=device:restart] | resp : ");
 }
 
 void RAK4270::sleep()
@@ -467,7 +440,7 @@ void RAK4270::sleep()
     }
     _rak->flush();
 
-    Serial.print("cmd : [at+set_config=device:restart] | resp : ");
+    Serial.print("cmd : [at+set_config=device:sleep] | resp : ");
     // for (int j = 0; j < 29; j++)
     // {
     //         if (recvString[j]!='0'){
@@ -498,6 +471,7 @@ void RAK4270::sleep()
       {
         Serial.println("AT sleep Failed 5 times! _rak & ESP reset.");
         delay(100);
+        break;
       }
     }
     Serial.println("");
@@ -545,8 +519,9 @@ void RAK4270::wakeup()
       }
       else
       {
-        Serial.println("AT sleep Failed 5 times! _rak & ESP reset.");
+        Serial.println("AT wakeup Failed 5 times! _rak & ESP reset.");
         delay(100);
+        break;
       }
     }
     Serial.println("");

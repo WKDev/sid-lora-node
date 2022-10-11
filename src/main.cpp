@@ -1,38 +1,8 @@
-#include <Arduino.h>
-#include <string>
-#include <Preferences.h>
-#include <stdio.h>
-#include <RAK4270/RAK4270.h>
-#include "lut-reader/lut-reader.h"
-#include "soil-reader/soil-reader.h"
-
-#include <iomanip>
-#include "util/pin_configuration.h"
-#include "util/sys_config.h"
-#include <sstream> //stringstream
-#include <string>
-#include <iostream>
-#include "soil-util/soildriver.h"
 #include "main.h"
-
-using namespace std;
-
-#define DERE 21
-#define SURFACE_TO_PROBE 0.809
-// #define RI 18
-// #define RO 19
 
 #define DEBUG
 #define WATERLEVEL
 // #define SOIL
-
-HardwareSerial RakSerial(1);
-// HardwareSerial SoilSerial(2);
-
-RAK4270 RAK;
-// LUT lut;
-
-int fetchRetryCount = 0;
 
 // hardwareserial count from 0:
 // 0 is reserved for typical TX RX
@@ -54,9 +24,9 @@ void SoilProcess()
 
   while (true)
   {
-    String ss = "00000000";
+    String ss = "";
     byte recv[21] = {
-        0,
+        1,
     };
 
     soil.getData(layer, recv);
@@ -73,12 +43,12 @@ void SoilProcess()
     float temp = ((recv[3] << 8) | recv[4]) / 10.0;
     float humid = ((recv[5] << 8) | recv[6]) / 10.0;
     int ec = (recv[7] << 8) | recv[8];
-    int ph = ((recv[9] << 8) | recv[10]) / 100.0;
+    float ph = ((recv[9] << 8) | recv[10]) / 100.0;
     int N = (recv[11] << 8) | recv[12];
     int P = (recv[13] << 8) | recv[14];
     int K = (recv[15] << 8) | recv[16];
-    int salt = ((recv[17] << 8) | recv[18]) / 10.0;
-    int crc = (recv[19] << 8) | recv[20];
+    int salt = ((recv[17] << 8) | recv[18]);
+    // int crc = (recv[19] << 8) | recv[20];
 
     // Serial.printf("layer : %d | temp : %1fC | humid : %1f% | ec : %d uS | tds : %d | N : %d | P : %d | K : %d | salt : %d \n", layer, temp, moisture, ec, tds, n, p, k, salt);
 
@@ -89,7 +59,15 @@ void SoilProcess()
     // 5번 시도하면 끝
     if (fetchRetryCount > 5)
     {
+
+      Serial.println("fetching data failed 5 times. sending null data and gets to sleep");
       fetchRetryCount = 0;
+      RAK.setJoin();
+      delay(5000);
+      // ss.c_str())
+      ss = "000000000000000000000000000000000000000000";
+      RAK.SendData("15", ss.c_str());
+
       break;
     }
 
@@ -109,9 +87,9 @@ void SoilProcess()
       delay(5000);
       // ss.c_str())
       RAK.SendData("15", ss.c_str());
-
       break;
     }
+
     else
     {
       Serial.println("fetching data failed..retrying");
@@ -129,17 +107,34 @@ void WaterlevelProcess()
 {
   while (true)
   {
-    byte recv[9];
-    byte arres[4];
+      // float to hex
+      String s = "00000000";
+
+        // 5번 시도하면 끝
+    if (fetchRetryCount > 5)
+    {
+
+      Serial.println("fetching data failed 5 times. sending null data and gets to sleep");
+      fetchRetryCount = 0;
+      RAK.setJoin();
+      delay(5000);
+      // ss.c_str())
+      s = "000000000000000000000000000000000000000000";
+      RAK.SendData("15", s.c_str());
+
+      break;
+    }
+
+    byte recv[9] = {0x00,};
+    byte arres[4]= {0x00,};
 
     float waterlevel = lut.getLevel(recv); // returns waterlevel with m unit.
     float corrected_level = (SURFACE_TO_PROBE - waterlevel);
 
     // 수위센서로부터 정상적인 값을 받아오는 경우,
-    if ((recv[0] == 1) && (recv[1] == 3) && (recv[2] == 4))
+    if ((recv[0] == 0x01) && (recv[1] == 0x03) && (recv[2] == 0x10))
     {
-      // float to hex
-      String s = "00000000";
+
 
       Serial.println();
       for (int i = 3; i > -1; i--)
@@ -156,18 +151,16 @@ void WaterlevelProcess()
 
         Serial.print(",");
       }
-      String ss = "00000000" + bytetoStr(recv[3]) + bytetoStr(recv[4]) + bytetoStr(recv[5]) + bytetoStr(recv[6]);
+      String ss = bytetoStr(recv[3]) + bytetoStr(recv[4]) + bytetoStr(recv[5]) + bytetoStr(recv[6]);
       unsigned long hex_value = arres[3] << 24 | arres[2] << 16 | arres[1] << 8 | arres[0];
       float modified = *((float *)&hex_value);
       Serial.print("expected correctedvalue : ");
       Serial.println(corrected_level);
-      Serial.print("expected correctedvalue : ");
-      Serial.println(corrected_level);
       Serial.print("typical : ");
       Serial.println(ss);
-      // Serial.print("modified : ");
-      // Serial.println(s);
-      // Serial.println(modified, 4);
+      Serial.print("modified : ");
+      Serial.println(s);
+      Serial.println(modified, 4);
 #endif
 
       String consoleStr = String(waterlevel) + " | " + String(corrected_level);
@@ -176,7 +169,6 @@ void WaterlevelProcess()
       RAK.setJoin();
       delay(5000);
       RAK.SendData("15", s.c_str());
-
       break;
     }
     else
@@ -191,11 +183,24 @@ void WaterlevelProcess()
 void setup()
 {
   Serial.begin(115200);
+
+  Serial.println("bootCount : " + String(bootCount));
+
+  if (bootCount > 50)
+  {
+    bootCount = 0;
+    Serial.println("bootCount reaches 50 times. system restarted for stability");
+    ESP.restart();
+  }
+
   RAK.init(&RakSerial, RAK_TX, RAK_RX);
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
   RAK.wakeup();
-  delay(500);
+
+  Serial.println("RAK restart : ");
+
   RAK.restart();
+  delay(1500);
 
 #ifdef WATERLEVEL
   lut.init();
@@ -208,6 +213,7 @@ void setup()
 #endif
 
   Serial.println("LTE Modem Power Off & ESP deep sleep start. ");
+  bootCount++;
   RAK.sleep();
   esp_deep_sleep_start();
 }
@@ -215,7 +221,7 @@ void setup()
 void loop()
 {
   Serial.println("loop");
-  delay(1000);
+  delay(10000);
 }
 
 String bytetoStr(byte a)
@@ -356,7 +362,7 @@ String bytetoStr(byte a)
 
 //   // // RS485 송신모드로 변경
 //   // digitalWrite(modepin, MODBUS_WRITE);
-//   // //데이터 전송~
+//   // //데이터 전송
 //   // rs485.write(request, 8);
 //   // //다시 수신모드로 변경(슬레이브의 응답을 기다리는 상태)
 //   // digitalWrite(modepin, MODBUS_READ);
@@ -365,7 +371,7 @@ String bytetoStr(byte a)
 //   // uint8_t response[21];
 //   // if (rs485_receive(response) != -1)
 //   // {
-//   //   //응답이 날라온 경우!
+//   //   //응답이 날라온 경우
 
 //   //   Serial.print("수신메시지:");
 //   //   for (int i = 0; i < 21; i++)

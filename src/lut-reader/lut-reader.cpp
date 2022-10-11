@@ -14,7 +14,7 @@ void LUT::init()
     rs485.begin(9600);                  //아두이노-rs485간 TTL통신
     pinMode(modepin, OUTPUT);           //송수신제어핀
     digitalWrite(modepin, MODBUS_READ); //수신모드
-    Serial.print("Waterlevel Sensor Ready");
+    Serial.println("Waterlevel Sensor Ready");
 }
 
 float LUT::getLevel(byte arr[])

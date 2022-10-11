@@ -18,6 +18,8 @@ public:
     void setJoin();
 
     void restart();
+    void sleep();
+    void wakeup();
 
 private:
     Stream* _rak;

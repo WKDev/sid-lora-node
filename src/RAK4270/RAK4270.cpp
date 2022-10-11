@@ -43,39 +43,39 @@ void RAK4270::setJoin()
     Serial.print("cmd : [at+join] | resp : ");
     for (int j = 0; j < 29; j++)
     {
-      if (recvString[j] != '0')
+      if (recvString[j] != '\0')
       {
         Serial.print(recvString[j]);
       }
     }
+    // Serial.println("");
 
     if (recvString[0] == 'O' && recvString[1] == 'K')
     {
-      Serial.println("AT Join Success. Keep going on.");
       break;
     }
     else
     {
       break;
-      retryCount++;
-      if (retryCount < 5)
-      {
-        Serial.print("..");
-      }
-      else
-      {
-        Serial.println("AT Join Failed 5 times! _rak & ESP reset.");
 
-        _rak->write("at+set_config=device:restart\r\n");
-        delay(100);
+      // retryCount++;
+      // if (retryCount < 5)
+      // {
+      //   Serial.print("..");
+      // }
+      // else
+      // {
+      //   Serial.println("AT Join Failed 5 times! _rak & ESP reset.");
 
-        ESP.restart();
-      }
+      //   // _rak->write("at+set_config=device:restart\r\n");
+      //   delay(100);
+
+      //   // ESP.restart();
     }
-    Serial.println("");
-
-    delay(_TimeOut);
   }
+  Serial.println("");
+
+  delay(_TimeOut);
 }
 
 void RAK4270::SendData(const char *port, const char *payload)
@@ -112,11 +112,12 @@ void RAK4270::SendData(const char *port, const char *payload)
       if (recvString[j] != '0' && recvString[j] != 0 && recvString[j] != '\0')
       {
         Serial.print(recvString[j]);
-      } 
+      }
     }
 
     if (recvString[0] == 'E' && recvString[1] == 'R')
     {
+
       retryCount++;
       if (retryCount < 5)
       {
@@ -126,10 +127,11 @@ void RAK4270::SendData(const char *port, const char *payload)
       {
         Serial.println("AT Send Failed 5 times! _rak & ESP reset.");
 
-        _rak->write("at+set_config=device:restart\r\n");
+        // _rak->write("at+set_config=device:restart\r\n");
         delay(100);
 
-        ESP.restart();
+        // ESP.restart();
+        break;
       }
     }
     else if (recvString[0] == 'O' && recvString[1] == 'K')
@@ -438,6 +440,113 @@ void RAK4270::restart()
         delay(100);
 
         ESP.restart();
+      }
+    }
+    Serial.println("");
+
+    delay(_TimeOut);
+  }
+}
+
+void RAK4270::sleep()
+{
+  char recvString[20] = {
+      0,
+  };
+  int retryCount = 0;
+
+  while (true)
+  {
+    _rak->write("at+set_config=device:sleep:1\r\n");
+    delay(500);
+
+    int availableBytes = _rak->available();
+    for (int i = 0; i < availableBytes; i++)
+    {
+      recvString[i] = _rak->read();
+    }
+    _rak->flush();
+
+    Serial.print("cmd : [at+set_config=device:restart] | resp : ");
+    // for (int j = 0; j < 29; j++)
+    // {
+    //         if (recvString[j]!='0'){
+    // Serial.print(recvString[j]);
+    //       Serial.print(" ");
+    //}
+    // }
+
+    if (recvString[0] == 'O' && recvString[1] == 'K')
+    {
+      String s = "";
+      for (int i = 0; i < 20; i++)
+      {
+        s += String(recvString[i]);
+      }
+
+      Serial.println(s);
+      break;
+    }
+    else
+    {
+      retryCount++;
+      if (retryCount < 5)
+      {
+        Serial.print("..");
+      }
+      else
+      {
+        Serial.println("AT sleep Failed 5 times! _rak & ESP reset.");
+        delay(100);
+      }
+    }
+    Serial.println("");
+
+    delay(_TimeOut);
+  }
+}
+
+void RAK4270::wakeup()
+{
+  char recvString[20] = {
+      0,
+  };
+  int retryCount = 0;
+
+  while (true)
+  {
+    _rak->write("at+set_config=device:sleep:0\r\n");
+    delay(500);
+
+    int availableBytes = _rak->available();
+    for (int i = 0; i < availableBytes; i++)
+    {
+      recvString[i] = _rak->read();
+    }
+    _rak->flush();
+
+    if (recvString[0] == 'O' && recvString[1] == 'K')
+    {
+      String s = "";
+      for (int i = 0; i < 20; i++)
+      {
+        s += String(recvString[i]);
+      }
+
+      Serial.println(s);
+      break;
+    }
+    else
+    {
+      retryCount++;
+      if (retryCount < 5)
+      {
+        Serial.print("..");
+      }
+      else
+      {
+        Serial.println("AT sleep Failed 5 times! _rak & ESP reset.");
+        delay(100);
       }
     }
     Serial.println("");

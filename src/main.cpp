@@ -13,6 +13,8 @@
 #include <string>
 #include <iostream>
 #include "soil-util/soildriver.h"
+#include "main.h"
+
 using namespace std;
 
 #define DERE 21
@@ -21,12 +23,17 @@ using namespace std;
 // #define RO 19
 
 #define DEBUG
+#define WATERLEVEL
+// #define SOIL
 
-// #define WATERLEVEL
+HardwareSerial RakSerial(1);
+// HardwareSerial SoilSerial(2);
 
-#define SOIL
+RAK4270 RAK;
+// LUT lut;
 
-String bytetoStr(byte a);
+int fetchRetryCount = 0;
+
 // hardwareserial count from 0:
 // 0 is reserved for typical TX RX
 // 1 is for send at command
@@ -34,18 +41,12 @@ String bytetoStr(byte a);
 // hardwareserial 1, 16--TX1, 17 --RX1  worked
 // hardwareserial 1, 26--TX1, 27 --RX1  worked
 // hardwareserial 2, 26--TX1, 27 --RX1 worked
-Preferences prfs;
-HardwareSerial RakSerial(1);
-// HardwareSerial SoilSerial(2);
-
-RAK4270 RAK;
-// LUT lut;
-SoilDriver soil;
-
-SoftwareSerial SoilSerial(19, 18);
-int fetchRetryCount = 0;
+// Preferences prfs;
 
 #ifdef SOIL
+SoilDriver soil;
+SoftwareSerial SoilSerial(19, 18);
+
 void SoilProcess()
 {
 
@@ -122,6 +123,8 @@ void SoilProcess()
 #endif
 
 #ifdef WATERLEVEL
+LUT lut;
+
 void WaterlevelProcess()
 {
   while (true)
@@ -178,7 +181,7 @@ void WaterlevelProcess()
     }
     else
     {
-      wlevelRetryCount++;
+      fetchRetryCount++;
       delay(1000);
     }
   }
@@ -190,6 +193,9 @@ void setup()
   Serial.begin(115200);
   RAK.init(&RakSerial, RAK_TX, RAK_RX);
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  RAK.wakeup();
+  delay(500);
+  RAK.restart();
 
 #ifdef WATERLEVEL
   lut.init();
@@ -202,6 +208,7 @@ void setup()
 #endif
 
   Serial.println("LTE Modem Power Off & ESP deep sleep start. ");
+  RAK.sleep();
   esp_deep_sleep_start();
 }
 

@@ -1,17 +1,8 @@
 #include "main.h"
 
 #define DEBUG
-#define WATERLEVEL
-// #define SOIL
-
-// hardwareserial count from 0:
-// 0 is reserved for typical TX RX
-// 1 is for send at command
-
-// hardwareserial 1, 16--TX1, 17 --RX1  worked
-// hardwareserial 1, 26--TX1, 27 --RX1  worked
-// hardwareserial 2, 26--TX1, 27 --RX1 worked
-// Preferences prfs;
+// #define WATERLEVEL
+#define SOIL
 
 #ifdef SOIL
 SoilDriver soil;
@@ -19,9 +10,7 @@ SoftwareSerial SoilSerial(19, 18);
 
 void SoilProcess()
 {
-
   byte layer = 1;
-
   while (true)
   {
     String ss = "";
@@ -212,9 +201,10 @@ void setup()
   SoilProcess();
 #endif
 
-  Serial.println("LTE Modem Power Off & ESP deep sleep start. ");
   bootCount++;
   RAK.sleep();
+    Serial.println("LTE Modem Power Off & ESP deep sleep start. ");
+
   esp_deep_sleep_start();
 }
 

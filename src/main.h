@@ -9,8 +9,8 @@
 #define PWR_PIN 27
 #define STAT_PIN 26
 
-#define RAK_TX 16// third pin from top-right of BG 96
-#define RAK_RX 17// fourth pin from top-right of BG 96
+#define RAK_TX 16 //TX2
+#define RAK_RX 17 // RX2
 #define MODEPIN 21
 #define RS485_RI 19
 #define RS485_RO 18
@@ -25,6 +25,17 @@ RTC_DATA_ATTR int bootCount = 0;
 
 HardwareSerial RakSerial(1);
 // HardwareSerial SoilSerial(2);
+
+// hardwareserial count from 0:
+// 0 is reserved for typical TX RX
+// 1 is for send at command
+
+// hardwareserial 1, 16--TX1, 17 --RX1  worked
+// hardwareserial 1, 26--TX1, 27 --RX1  worked
+// hardwareserial 2, 26--TX1, 27 --RX1 worked
+// Preferences prfs;
+
+
 RAK4270 RAK;
 // LUT lut;
 int fetchRetryCount = 0;

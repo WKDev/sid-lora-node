@@ -6,4 +6,8 @@ class LUT{
         float getLevel(byte arr[]);
         int rs485_receive(byte recv[]);
 
+
+    private:
+        Stream* _lut;
+
 };

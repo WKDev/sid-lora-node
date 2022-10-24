@@ -2,6 +2,7 @@
 #include <string>
 #include <Preferences.h>
 #include <stdio.h>
+
 #include "RAK4270/RAK4270.h"
 #include "lut-reader/lut-reader.h"
 #include "soil-util/soildriver.h"
@@ -9,14 +10,17 @@
 #define PWR_PIN 27
 #define STAT_PIN 26
 
-#define RAK_TX 16 //TX2
-#define RAK_RX 17 // RX2
+#define RAK_TX 16// third pin from top-right of BG 96
+#define RAK_RX 17// fourth pin from top-right of BG 96
 #define MODEPIN 21
 #define RS485_RI 19
 #define RS485_RO 18
+#define BUTTON 25
+
+#define PRESS_DURATION 500
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  900       /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP  300       /* Time ESP32 will go to sleep (in seconds) */
 #define SURFACE_TO_PROBE  0.809       
 
 using namespace std;
@@ -24,21 +28,12 @@ using namespace std;
 RTC_DATA_ATTR int bootCount = 0;
 
 HardwareSerial RakSerial(1);
-// HardwareSerial SoilSerial(2);
-
-// hardwareserial count from 0:
-// 0 is reserved for typical TX RX
-// 1 is for send at command
-
-// hardwareserial 1, 16--TX1, 17 --RX1  worked
-// hardwareserial 1, 26--TX1, 27 --RX1  worked
-// hardwareserial 2, 26--TX1, 27 --RX1 worked
-// Preferences prfs;
-
-
+HardwareSerial LutSerial(2);
 RAK4270 RAK;
 // LUT lut;
 int fetchRetryCount = 0;
+Preferences prfs;
+
 
 
 void print_wakeup_reason(){
@@ -58,3 +53,4 @@ void print_wakeup_reason(){
 }
 
 String bytetoStr(byte a);
+

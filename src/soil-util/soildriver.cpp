@@ -48,6 +48,7 @@ void SoilDriver::getData(byte layer, byte arr[])
     byte res[RECV_LENGTH] = {
         0,
     };
+    
     if (rs485_receive(res) != -1)
     {
         //응답이 날라온 경우!
@@ -58,16 +59,6 @@ void SoilDriver::getData(byte layer, byte arr[])
             // DebugSer->print(res[i], HEX);
             // DebugSer->print(",");
         }
-
-        // responce[3] = high byte
-        // responce[4] = low byte
-        //  int ret = (res[3] << 8) | res[4];
-        // unsigned long hex_value = res[3] << 24 | res[4] << 16 | res[5] << 8 | res[6];
-        // float converted = *((float *)&hex_value);
-        // //  Serial.print(" | concatenated=");
-        // //  Serial.print(hex_value, HEX);
-        // DebugSer->print(" | converted=");
-        // DebugSer->println(converted, 4);
     }
     else
     {

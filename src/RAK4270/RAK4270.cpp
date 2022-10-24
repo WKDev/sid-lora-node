@@ -57,7 +57,7 @@ void RAK4270::setJoin()
       retryCount++;
       if (retryCount < 5)
       {
-        Serial.print("..");
+        Serial.println("setjoin : ..");
       }
       else
       {
@@ -469,7 +469,7 @@ void RAK4270::sleep()
       }
       else
       {
-        Serial.println("AT sleep Failed 5 times! _rak & ESP reset.");
+        Serial.println("AT restart Failed 5 times! _rak & ESP reset.");
         delay(100);
         break;
       }

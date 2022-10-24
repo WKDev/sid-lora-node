@@ -1,6 +1,11 @@
 #include "lut-reader.h"
 #include <Arduino.h>
 
+// #define ESMUS10A
+
+#define LUT18
+
+
 //RS485 to TTL
 #define modepin 21 //통신의 송신과 수신을 변환하는 핀
 #define MODBUS_READ LOW
@@ -14,14 +19,19 @@ void LUT::init()
     rs485.begin(9600);                  //아두이노-rs485간 TTL통신
     pinMode(modepin, OUTPUT);           //송수신제어핀
     digitalWrite(modepin, MODBUS_READ); //수신모드
-    Serial.println("Waterlevel Sensor Ready");
+    Serial.print("Waterlevel Sensor Ready");
 }
 
 float LUT::getLevel(byte arr[])
 {
-    byte req[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x08, 0x44, 0x0c}; // inquiry for LUT-18
 
-    // byte req[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x02, 0xc4, 0x0b}; // inquiry for LUT-18
+    // byte req[] = {0x01, 0x03, 0x00, 0x01, 0x00, 0x01, 0xd5, 0xca}; // distance for production model
+
+    // byte req[] = {0x01, 0x03, 0x00, 0x06, 0x00, 0x01, 0x64, 0x0b}; // level for production model
+
+    // byte req[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x08, 0x44, 0x0c}; // inquiry for LUT-18
+
+    byte req[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x02, 0xc4, 0x0b}; // inquiry for LUT-18
 
     digitalWrite(modepin, MODBUS_WRITE);
     rs485.write(req, 8);
@@ -41,15 +51,31 @@ float LUT::getLevel(byte arr[])
         // responce[3] = high byte
         // responce[4] = low byte
         //  int ret = (res[3] << 8) | res[4];
-        unsigned long hex_value = res[3] << 24 | res[4] << 16 | res[5] << 8 | res[6];
         
+
+        #ifdef LUT18
+        unsigned long hex_value = res[3] << 24 | res[4] << 16 | res[5] << 8 | res[6];
+
         float converted = *((float *)&hex_value);
         //  Serial.print(" | concatenated=");
         //  Serial.print(hex_value, HEX);
         Serial.print(" | converted=");
         Serial.println(converted, 4);
-
         return converted;    
+
+        #endif
+
+        #ifdef ESMUS10A
+        unsigned long hex_value = res[3] << 8 | res[4];
+        int converted = *((int *)&hex_value);
+        //  Serial.print(" | concatenated=");
+        //  Serial.print(hex_value, HEX);
+        Serial.print(" | converted=");
+        Serial.println(converted);
+        return (float)converted;    
+        #endif
+
+        
     }
     else
     {

@@ -1,0 +1,418 @@
+
+#include "main.h"
+
+#define DEBUG
+// #define WATERLEVEL
+#define SOIL
+
+#ifdef SOIL
+SoilDriver soil;
+SoftwareSerial SoilSerial(19, 18);
+
+void SoilProcess()
+{
+  byte layer = 1;
+  while (true)
+  {
+    String ss = "";
+    byte recv[21] = {
+        1,
+    };
+
+    soil.getData(layer, recv);
+
+#ifdef DEBUG
+    Serial.print(" recv : ");
+
+    for (int i = 0; i < 21; i++)
+    {
+      Serial.print(recv[i], HEX);
+      Serial.print(" ");
+    }
+    Serial.println("");
+    float temp = ((recv[3] << 8) | recv[4]) / 10.0;
+    float humid = ((recv[5] << 8) | recv[6]) / 10.0;
+    int ec = (recv[7] << 8) | recv[8];
+    float ph = ((recv[9] << 8) | recv[10]) / 100.0;
+    int N = (recv[11] << 8) | recv[12];
+    int P = (recv[13] << 8) | recv[14];
+    int K = (recv[15] << 8) | recv[16];
+    int salt = ((recv[17] << 8) | recv[18]);
+    // int crc = (recv[19] << 8) | recv[20];
+
+    // Serial.printf("layer : %d | temp : %1fC | humid : %1f% | ec : %d uS | tds : %d | N : %d | P : %d | K : %d | salt : %d \n", layer, temp, moisture, ec, tds, n, p, k, salt);
+
+    Serial.printf("temp : %f | humid : %f | ec : %d uS | ph : %f | N : %d | P : %d | K : %d | salt : %d \n", temp, humid, ec, ph, N, P, K, salt);
+
+#endif
+
+    // 5번 시도하면 끝
+    if (fetchRetryCount > 5)
+    {
+
+      Serial.println("fetching data failed 5 times. sending null data and gets to sleep");
+      fetchRetryCount = 0;
+      RAK.setJoin();
+      delay(5000);
+      // ss.c_str())
+      ss = "000000000000000000000000000000000000000000";
+      RAK.SendData("15", ss.c_str());
+
+      break;
+    }
+
+    if ((recv[0] == 0x01) && (recv[1] == 0x03) && (recv[2] == 0x10))
+    {
+      // String으로 변환
+      for (int i = 3; i < 19; i++)
+      {
+        ss += bytetoStr(recv[i]);
+      }
+      delay(2000);
+
+      Serial.println("");
+
+      // RAK4270으로 전송
+      RAK.setJoin();
+      delay(5000);
+      // ss.c_str())
+      RAK.SendData("15", ss.c_str());
+      break;
+    }
+
+    else
+    {
+      Serial.println("fetching data failed..retrying");
+      fetchRetryCount++;
+      delay(1000);
+    }
+  }
+}
+#endif
+
+#ifdef WATERLEVEL
+LUT lut;
+
+void WaterlevelProcess()
+{
+  while (true)
+  {
+      // float to hex
+      String s = "00000000";
+
+        // 5번 시도하면 끝
+    if (fetchRetryCount > 5)
+    {
+
+      Serial.println("fetching data failed 5 times. sending null data and gets to sleep");
+      fetchRetryCount = 0;
+      RAK.setJoin();
+      delay(5000);
+      // ss.c_str())
+      s = "000000000000000000000000000000000000000000";
+      RAK.SendData("15", s.c_str());
+
+      break;
+    }
+
+    byte recv[9] = {0x00,};
+    byte arres[4]= {0x00,};
+
+    float waterlevel = lut.getLevel(recv); // returns waterlevel with m unit.
+    float corrected_level = (SURFACE_TO_PROBE - waterlevel);
+
+    // 수위센서로부터 정상적인 값을 받아오는 경우,
+    if ((recv[0] == 0x01) && (recv[1] == 0x03) && (recv[2] == 0x10))
+    {
+
+
+      Serial.println();
+      for (int i = 3; i > -1; i--)
+      {
+        arres[i] = *((char *)&corrected_level + i);
+        s += bytetoStr(arres[i]);
+      }
+
+#ifdef DEBUG
+      Serial.print("\nrecv:");
+      for (int i = 0; i < 9; i++)
+      {
+        Serial.print(recv[i], HEX);
+
+        Serial.print(",");
+      }
+      String ss = bytetoStr(recv[3]) + bytetoStr(recv[4]) + bytetoStr(recv[5]) + bytetoStr(recv[6]);
+      unsigned long hex_value = arres[3] << 24 | arres[2] << 16 | arres[1] << 8 | arres[0];
+      float modified = *((float *)&hex_value);
+      Serial.print("expected correctedvalue : ");
+      Serial.println(corrected_level);
+      Serial.print("typical : ");
+      Serial.println(ss);
+      Serial.print("modified : ");
+      Serial.println(s);
+      Serial.println(modified, 4);
+#endif
+
+      String consoleStr = String(waterlevel) + " | " + String(corrected_level);
+      Serial.println(consoleStr);
+      // RAK4270을 통해 데이터 송신
+      RAK.setJoin();
+      delay(5000);
+      RAK.SendData("15", s.c_str());
+      break;
+    }
+    else
+    {
+      fetchRetryCount++;
+      delay(1000);
+    }
+  }
+}
+#endif
+
+void setup()
+{
+  Serial.begin(115200);
+
+  Serial.println("bootCount : " + String(bootCount));
+
+  if (bootCount > 50)
+  {
+    bootCount = 0;
+    Serial.println("bootCount reaches 50 times. system restarted for stability");
+    ESP.restart();
+  }
+
+  RAK.init(&RakSerial, RAK_TX, RAK_RX);
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  RAK.wakeup();
+
+  Serial.println("RAK restart : ");
+
+  RAK.restart();
+  delay(1500);
+
+#ifdef WATERLEVEL
+  lut.init();
+  WaterlevelProcess();
+#endif
+
+#ifdef SOIL
+  soil.init(&Serial, &SoilSerial, MODEPIN, RS485_RI, RS485_RO);
+  SoilProcess();
+#endif
+
+  bootCount++;
+  RAK.sleep();
+    Serial.println("LTE Modem Power Off & ESP deep sleep start. ");
+
+  esp_deep_sleep_start();
+}
+
+void loop()
+{
+  Serial.println("loop");
+  delay(10000);
+}
+
+String bytetoStr(byte a)
+{
+  String ss;
+  if ((a < 16))
+  {
+    ss = "0" + String(a, 16);
+  }
+  else
+  {
+    ss = String(a, 16);
+  }
+
+  return ss;
+}
+
+// #include <Arduino.h>
+// #include <string>
+// #include <Preferences.h>
+// #include <stdio.h>
+// #include <RAK4270/RAK4270.h>
+// #include "lut-reader/lut-reader.h"
+// #include <iomanip>
+// #include "util/pin_configuration.h"
+// #include "util/sys_config.h"
+// #include <sstream> //stringstream
+// #include <string>
+// #include <iostream>
+
+// using namespace std;
+
+// #define DERE 21
+// #define SURFACE_TO_PROBE 0.809
+// // #define RI 18
+// // #define RO 19
+
+// // #define DEBUG
+
+// #define WATERLEVEL
+// #define SOIL
+
+// char *DevEui = {
+//     0,
+// };
+// char *AppEui = {
+//     0,
+// };
+
+// String bytetoStr(byte a);
+// // hardwareserial count from 0:
+// // 0 is reserved for typical TX RX
+// // 1 is for send at command
+
+// // hardwareserial 1, 16--TX1, 17 --RX1  worked
+// // hardwareserial 1, 26--TX1, 27 --RX1  worked
+// // hardwareserial 2, 26--TX1, 27 --RX1 worked
+// Preferences prfs;
+// HardwareSerial RakSerial(1);
+// RAK4270 RAK;
+// LUT lut;
+
+// int wlevelRetryCount = 0;
+
+// void setup()
+// {
+//   RAK.init(&RakSerial, 16, 17);
+//   lut.init();
+
+//   // rx, tx
+//   Serial.begin(115200);
+//   Serial.println("Booting");
+
+//    while (wlevelRetryCount < 10)
+//   {
+
+//     byte recv[9];
+//     float waterlevel = lut.getLevel(recv); // returns waterlevel with m unit.
+//     float corrected_level = (SURFACE_TO_PROBE - waterlevel);
+
+//     // 수위센서로부터 정상적인 값을 받아오는 경우,
+//     if ((recv[0] == 1) && (recv[1] == 3) && (recv[2] == 4))
+//     {
+//       // float to hex
+//       byte arres[4];
+//       String s = "00000000";
+
+//       Serial.println();
+//       for (int i = 3; i > -1; i--)
+//       {
+//         arres[i] = *((char *)&corrected_level + i);
+//         s += bytetoStr(arres[i]);
+//       }
+
+//       String consoleStr = String(waterlevel)+ " | " +String(corrected_level);
+//       Serial.println(consoleStr);
+//       //RAK4270을 통해 데이터 송신
+
+//     }
+//     else
+//     { //10회 실패 시,
+//       wlevelRetryCount++;
+//       delay(1000);
+//     }
+
+// #ifdef DEBUG
+//     Serial.print("\nrecv:");
+//     for (int i = 0; i < 9; i++)
+//     {
+//       Serial.print(recv[i], HEX);
+
+//       Serial.print(",");
+//     }
+//     String ss = "00000000" + bytetoStr(recv[3]) + bytetoStr(recv[4]) + bytetoStr(recv[5]) + bytetoStr(recv[6]);
+//     unsigned long hex_value = arres[3] << 24 | arres[2] << 16 | arres[1] << 8 | arres[0] float modified = *((float *)&hex_value);
+//     Serial.print("expected correctedvalue : ");
+//     Serial.println(corrected_level);
+//     Serial.print("expected correctedvalue : ");
+//     Serial.println(corrected_level);
+//     Serial.print("typical : ");
+//     Serial.println(ss);
+//     Serial.print("modified : ");
+//     Serial.println(s);
+//     Serial.println(modified, 4);
+// #endif
+//   }
+
+//   // RAK.setJoin();
+//   // delay(2000);
+//   // RAK.getStatus();
+//   // delay(1000);
+
+//   // RAK.SendData("15", "00f300f300f303e803e803e801d201d201d202b402b402b4");
+//   // delay(3000);
+
+//   // byte request[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x08, 0x44, 0x0c}; // inquiry for soil sensor
+//   //                                                                    // uint8_t buf[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x08, 0x44, 0x0c}; // inquiry for soil sensor
+
+//   // // RS485 송신모드로 변경
+//   // digitalWrite(modepin, MODBUS_WRITE);
+//   // //데이터 전송
+//   // rs485.write(request, 8);
+//   // //다시 수신모드로 변경(슬레이브의 응답을 기다리는 상태)
+//   // digitalWrite(modepin, MODBUS_READ);
+
+//   // //슬레이브의 응답을 기다려야 하는 상태
+//   // uint8_t response[21];
+//   // if (rs485_receive(response) != -1)
+//   // {
+//   //   //응답이 날라온 경우
+
+//   //   Serial.print("수신메시지:");
+//   //   for (int i = 0; i < 21; i++)
+//   //   {
+//   //     Serial.print(response[i], HEX);
+//   //     Serial.print(",");
+//   //   }
+
+//   //   // response[3] 데이터 high byte
+//   //   // response[4] 데이터 low byte
+//   //   Serial.println("");
+//   //   temp = ((response[3] << 8) | response[4])/ 10.0;
+//   //   humid = ((response[5] << 8) | response[6]) / 10.0;
+//   //   ec = (response[7] << 8) | response[8];
+//   //   ph = ((response[9] << 8) | response[10]) / 100.0;
+//   //   N = (response[11] << 8) | response[12];
+//   //   P = (response[13] << 8) | response[14];
+//   //   K = (response[15] << 8) | response[16];
+//   //   salt = ((response[17] << 8) | response[18])/10.0;
+//   //   crc = (response[19] << 8) | response[20];
+//   // }
+
+//   //   Serial.printf("temp : %f | humid : %f | ec : %d uS | ph : %f | N : %d | P : %d | K : %d | salt : %d \n", temp, humid, ec, ph, N, P, K, salt);
+
+//   // Set timer to 5 seconds
+//   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+//   Serial.println("\nESP gets to sleep " + String(TIME_TO_SLEEP) +
+//                  " Seconds");
+
+//   // Go to sleep now
+//   esp_deep_sleep_start();
+// }
+
+// String bytetoStr(byte a)
+// {
+//   String ss;
+//   if (a < 10)
+//   {
+//     ss = "0" + String(a, 16);
+//   }
+//   else
+//   {
+//     ss = String(a, 16);
+//   }
+
+//   return ss;
+// }
+
+// void loop()
+// {
+//  //TODO : 3 layer 센서 데이터 값 받아오고, 드라이버 설치하기
+
+// }

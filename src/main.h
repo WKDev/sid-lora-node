@@ -17,10 +17,10 @@
 #define RS485_RO 18
 #define BUTTON 25
 
-#define PRESS_DURATION 500
+#define PRESS_DURATION 900
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  300       /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP  900       /* Time ESP32 will go to sleep (in seconds) */
 #define SURFACE_TO_PROBE  0.809       
 
 using namespace std;

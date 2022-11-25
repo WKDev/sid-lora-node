@@ -1,4 +1,6 @@
 #include "RAK4270.h"
+#include<stdlib.h>
+#include<time.h>
 
 void RAK4270::init(Stream *ser, int txpin, int rxpin)
 {
@@ -21,6 +23,19 @@ void RAK4270::getStatus()
   }
 }
 
+void hex_string(char str[], int length)
+{
+  //hexadecimal characters
+  char hex_characters[]={'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+  
+  int i;
+  for(i=0;i<length;i++)
+  {
+    str[i]=hex_characters[rand()%16];
+  }
+  str[length]=0;
+}
+
 void RAK4270::setJoin()
 {
   char recvString[32] = {
@@ -28,10 +43,59 @@ void RAK4270::setJoin()
   };
   int retryCount = 0;
 
+    // 260125D7
+
+    String rand_dev_addr = "";
+
+
+    // for (int i = 3; i > -1; i--)
+    //   {
+    //     arres[i] = *((char *)&corrected_level + i);
+    //     s += bytetoStr(arres[i]);
+    //   }
+
+          // rand_dev_addr +=byte(random(0, 255));
+
+          char rd[30];
+          srand(random(99999999));
+          
+          hex_string(rd, 8);
+
+          for(int k = 0; k < 8 ; k++){
+          rand_dev_addr += String(*((char *)& rd[k]));
+          }
+
+          Serial.println(rd);
+
+          // rand_dev_addr += String(*((char *)& rd));
+
+  
+
+    String cmd = "at+set_config=lora:dev_addr:" + rand_dev_addr + "\r\n";
+    Serial.println(cmd);
+    _rak->write(cmd.c_str());
+    delay(1000);
+
+    int availableBytess = _rak->available();
+    for (int i = 0; i < availableBytess; i++)
+    {
+      recvString[i] = _rak->read();
+    }
+    _rak->flush();
+
+    String k = "";
+    for (int i = 0; i < 20; i++)
+    {
+      k += String(recvString[i]);
+    }
+
+    Serial.println(k);
+    delay(3000);
   while (true)
   {
+    Serial.println("at+join...");
     _rak->write("at+join\r\n");
-    delay(5000);
+    delay(10000);
 
     int availableBytes = _rak->available();
     for (int i = 0; i < availableBytes; i++)
@@ -45,23 +109,32 @@ void RAK4270::setJoin()
     {
       s += String(recvString[i]);
     }
-
     Serial.println(s);
 
     if (recvString[0] == 'O' && recvString[1] == 'K')
     {
       break;
     }
+    else if(s.indexOf("OK") != -1){
+      Serial.println("ok found in responce");
+      break;
+
+    }
+
     else
     {
       retryCount++;
-      if (retryCount < 5)
+      if (retryCount < 2)
       {
         Serial.println("setjoin : ..");
+         Serial.println("AT join failed");
+        //  break;
+
+
       }
       else
       {
-        Serial.println("AT sleep Failed 5 times! _rak & ESP reset.");
+        Serial.println("AT join Failed 2 times");
         delay(100);
         break;
       }
@@ -123,7 +196,7 @@ void RAK4270::SendData(const char *port, const char *payload)
     _rak->write(payload);
     _rak->write("\r\n");
 
-    delay(500);
+    delay(2000);
 
     int availableBytes = _rak->available();
     for (int i = 0; i < availableBytes; i++)

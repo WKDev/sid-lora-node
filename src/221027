@@ -4,14 +4,10 @@
 #define WATERLEVEL
 // #define LUT18
 #define ESMUS10A
+
 // #define SOIL
-#define init_set_zerolevel
 
-
-
-
-
-
+// #define init_set_zerolevel
 
 #ifdef SOIL
 SoilDriver soil;
@@ -100,11 +96,6 @@ void SoilProcess()
       RAK.setJoin();
       delay(5000);
       // ss.c_str())
-
-      // String fake = "008400ca00c802b2000f001500350105";
-
-      // RAK.SendData("15", fake.c_str());
-
       RAK.SendData("15", ss.c_str());
       break;
     }
@@ -128,6 +119,8 @@ unsigned long btnReleaseTime = 0;
 int currentState = 0;
 int lastState = 0;
 int btnPressCount = 0;
+
+float zero_lv = 0.809;
 
 // 영점이 어느 지점인지,
 float zero_level_coefficient = 0;
@@ -257,9 +250,7 @@ void WaterlevelProcess()
       esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
       RAK.wakeup();
 
-      RAK.restart();
-
-      
+      // RAK.restart();
 
       delay(1500);
       RAK.setJoin();
@@ -312,7 +303,6 @@ void setup()
       0x00,
   };
 
-  int retryCount = 0;
   float init_level = 0.0;
   /////////////초기값 받아오기 
   while (true)
@@ -363,13 +353,6 @@ void setup()
     else
     {
       Serial.println("Measuring init level was failed. retrying...");
-
-      if(retryCount > 10){
-        Serial.println("Measuring init level was failed. getting in to sleep...");
-        esp_deep_sleep_start();
-
-      }
-      retryCount++;
       delay(500);
     }
   }
@@ -422,27 +405,65 @@ void setup()
   }
   if (btnPressCount > 0)
   {
-    float res = zero_level_coefficient + float(btnPressCount * 0.005);
+    float res = init_level + float(btnPressCount * 0.005);
     prfs.putFloat("zerolevel", res);
     Serial.println("coeff is setted : " + String(res, 4U));
     ESP.restart();
   }
 #endif
 
-    String s = "00000000";
+  // WaterlevelProcess();
+  
+  /////////////////////////INSTEAD OF WaterLevelProcess//////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        byte arres[4] = {
+  while (true)
+  {
+    // float to hex
+    String s = "00000000";
+    byte recv[9] = {
         0x00,
     };
-    
-    //  prfs.putFloat("zerolevel", 0.600);
-    float waterlevel = init_level;
+
+    // 5번 시도하면 끝
+    if (fetchRetryCount > 5)
+    {
+
+      Serial.println("fetching data failed 5 times. sending null data and gets to sleep");
+      fetchRetryCount = 0;
+
+      RAK.init(&RakSerial, RAK_TX, RAK_RX);
+      esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+      RAK.wakeup();
+      delay(500);
+      RAK.restart();
+
+      delay(1500);
+      RAK.setJoin();
+      delay(5000);
+      // ss.c_str())
+      String s_err = "000000000000000000000000000000000000000000";
+      RAK.SendData("15", s_err.c_str());
+
+      break;
+    }
+
+
+
+    byte arres[4] = {
+        0x00,
+    };
+
+
+    float waterlevel = lut.getLevel(recv); // returns waterlevel with m unit.
+    Serial.println("wlevel = = " + String(waterlevel));
     float corrected_level = (zero_level_coefficient - waterlevel);
 
     if (corrected_level < 0.0)
     {
       corrected_level = 0;
-      Serial.println("[WARN] Corrected Level is below 0,  raw: " + String(waterlevel, 4U) + "corrected : " + String(corrected_level,4U));
+      Serial.println("[WARN] Corrected Level is below 0,  raw: " + String(waterlevel) + "corrected : " + String(corrected_level));
     }
 
     Serial.print("\nret:");
@@ -482,12 +503,12 @@ void setup()
         float modified = *((float *)&hex_value);
 
         Serial.print("expected correctedvalue : ");
-        Serial.println(corrected_level,4);
+        Serial.println(corrected_level);
         Serial.print("typical(ss, raw) : ");
         Serial.println(ss);
         Serial.print("modified(s) : ");
         Serial.println(s);
-        Serial.println(modified,4);
+        Serial.println(modified);
       }
 
       else if (recv[2] == 0x02)
@@ -504,7 +525,13 @@ void setup()
         Serial.println(ss);
         Serial.print("modified(s) : ");
         Serial.println(s);
-        Serial.println(modified,4U);
+        Serial.println(modified);
+      }
+      else
+      {
+        fetchRetryCount++;
+        delay(1000);
+        continue;
       }
 #endif
 
@@ -522,16 +549,16 @@ void setup()
       RAK.setJoin();
       delay(5000);
       RAK.SendData("15", s.c_str());
+      break;
     }
     else
     {
       fetchRetryCount++;
       delay(1000);
     }
-  
+  }//////////////////////////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////////////////////
 
-  // WaterlevelProcess();
-  
 #endif
 
 #ifdef SOIL
@@ -544,10 +571,7 @@ void setup()
   Serial.println("LoRaWAN Modem Power Off & ESP deep sleep start. ");
 
   esp_deep_sleep_start();
-  }
-  
-
-
+}
 
 void loop()
 {

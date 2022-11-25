@@ -1,0 +1,19 @@
+#include "main.h"
+
+LUT lut;
+void setup(){
+  Serial.begin(115200);
+  lut.init_new(&LutSerial, 19,18);
+}
+
+void loop(){
+  lut.init();
+
+  for (int i =0; i<5; i++){
+
+    byte recv[9] = {0x00,};
+    Serial.println(lut.getLevel_new(recv));
+    Serial.println(lut.getLevel(recv));
+    delay(500);
+  }
+}

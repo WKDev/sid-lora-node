@@ -50,6 +50,7 @@
         "cinttypes": "cpp",
         "typeinfo": "cpp",
         "main": "cpp",
-        "hex2float": "cpp"
+        "hex2float": "cpp",
+        "mainbakk": "c"
     }
 }
